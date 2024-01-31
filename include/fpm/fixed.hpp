@@ -127,33 +127,33 @@ public:
         return fixed::from_raw_value(-m_value);
     }
 
-    inline fixed& operator+=(const fixed& y) noexcept
+    constexpr inline fixed& operator+=(const fixed& y) noexcept
     {
         m_value += y.m_value;
         return *this;
     }
 
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
-    inline fixed& operator+=(I y) noexcept
+    constexpr inline fixed& operator+=(I y) noexcept
     {
         m_value += y * FRACTION_MULT;
         return *this;
     }
 
-    inline fixed& operator-=(const fixed& y) noexcept
+    constexpr inline fixed& operator-=(const fixed& y) noexcept
     {
         m_value -= y.m_value;
         return *this;
     }
 
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
-    inline fixed& operator-=(I y) noexcept
+    constexpr inline fixed& operator-=(I y) noexcept
     {
         m_value -= y * FRACTION_MULT;
         return *this;
     }
 
-    inline fixed& operator*=(const fixed& y) noexcept
+    constexpr inline fixed& operator*=(const fixed& y) noexcept
     {
 	if (EnableRounding){
 	    // Normal fixed-point multiplication is: x * y / 2**FractionBits.
@@ -169,13 +169,13 @@ public:
     }
 
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
-    inline fixed& operator*=(I y) noexcept
+    constexpr inline fixed& operator*=(I y) noexcept
     {
         m_value *= y;
         return *this;
     }
 
-    inline fixed& operator/=(const fixed& y) noexcept
+    constexpr inline fixed& operator/=(const fixed& y) noexcept
     {
         assert(y.m_value != 0);
 	if (EnableRounding){
@@ -192,7 +192,7 @@ public:
     }
 
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
-    inline fixed& operator/=(I y) noexcept
+    constexpr inline fixed& operator/=(I y) noexcept
     {
         m_value /= y;
         return *this;
