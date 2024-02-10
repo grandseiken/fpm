@@ -21,13 +21,10 @@ class fixed
 {
     static_assert(std::is_integral<BaseType>::value, "BaseType must be an integral type");
     static_assert(FractionBits > 0, "FractionBits must be greater than zero");
-    static_assert(FractionBits <= sizeof(BaseType) * 8 - 1, "BaseType must at least be able to contain entire fraction, with space for at least one integral bit");
+    static_assert(FractionBits + 2 <= sizeof(BaseType) * 8, "BaseType must at least be able to contain entire fraction, with space for at least two integral bits");
     static_assert(sizeof(IntermediateType) > sizeof(BaseType), "IntermediateType must be larger than BaseType");
     static_assert(std::numeric_limits<IntermediateType>::is_signed == std::numeric_limits<BaseType>::is_signed, "IntermediateType must have same signedness as BaseType");
-
-    // Although this value fits in the BaseType in terms of bits, if there's only one integral bit, this value
-    // is incorrect (flips from positive to negative), so we must extend the size to IntermediateType.
-    static constexpr IntermediateType FRACTION_MULT = IntermediateType(1) << FractionBits;
+    static constexpr BaseType FRACTION_MULT = BaseType{1} << FractionBits;
 
     struct raw_construct_tag {};
     constexpr inline fixed(BaseType val, raw_construct_tag) noexcept : m_value(val) {}
@@ -47,8 +44,8 @@ public:
     template <typename T, typename std::enable_if<std::is_floating_point<T>::value>::type* = nullptr>
     constexpr inline explicit fixed(T val) noexcept
         : m_value(static_cast<BaseType>((EnableRounding) ?
-		       (val >= 0.0) ? (val * FRACTION_MULT + T{0.5}) : (val * FRACTION_MULT - T{0.5})
-		      : (val * FRACTION_MULT)))
+		       (val >= 0.0) ? (val * T{FRACTION_MULT} + T{0.5}) : (val * T{FRACTION_MULT} - T{0.5})
+		      : (val * T{FRACTION_MULT})))
     {}
 
     // Constructs from another fixed-point type with possibly different underlying representation.
@@ -62,7 +59,7 @@ public:
     template <typename T, typename std::enable_if<std::is_floating_point<T>::value>::type* = nullptr>
     constexpr inline explicit operator T() const noexcept
     {
-        return static_cast<T>(m_value) / FRACTION_MULT;
+        return static_cast<T>(m_value) / static_cast<T>(FRACTION_MULT);
     }
 
     // Explicit conversion to an integral type
@@ -159,10 +156,10 @@ public:
 	    // Normal fixed-point multiplication is: x * y / 2**FractionBits.
 	    // To correctly round the last bit in the result, we need one more bit of information.
 	    // We do this by multiplying by two before dividing and adding the LSB to the real result.
-	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / (FRACTION_MULT / 2);
+	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / static_cast<IntermediateType>(FRACTION_MULT / 2);
 	    m_value = static_cast<BaseType>((value / 2) + (value % 2));
 	} else {
-	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / FRACTION_MULT;
+	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / static_cast<IntermediateType>(FRACTION_MULT);
 	    m_value = static_cast<BaseType>(value);
 	}
 	return *this;
@@ -182,10 +179,10 @@ public:
 	    // Normal fixed-point division is: x * 2**FractionBits / y.
 	    // To correctly round the last bit in the result, we need one more bit of information.
 	    // We do this by multiplying by two before dividing and adding the LSB to the real result.
-	    auto value = (static_cast<IntermediateType>(m_value) * FRACTION_MULT * 2) / y.m_value;
+	    auto value = (static_cast<IntermediateType>(m_value) * static_cast<IntermediateType>(FRACTION_MULT * 2)) / y.m_value;
 	    m_value = static_cast<BaseType>((value / 2) + (value % 2));
 	} else {
-	    auto value = (static_cast<IntermediateType>(m_value) * FRACTION_MULT) / y.m_value;
+	    auto value = (static_cast<IntermediateType>(m_value) * static_cast<IntermediateType>(FRACTION_MULT)) / y.m_value;
 	    m_value = static_cast<BaseType>(value);
 	}
         return *this;
