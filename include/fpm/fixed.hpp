@@ -69,6 +69,11 @@ public:
         return static_cast<T>(m_value / FRACTION_MULT);
     }
 
+    // Explicit conversion to bool
+    constexpr inline explicit operator bool() const noexcept {
+        return static_cast<bool>(m_value);
+    }
+
     // Returns the raw underlying value of this type.
     // Do not use this unless you know what you're doing.
     constexpr inline BaseType raw_value() const noexcept
