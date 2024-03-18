@@ -10,6 +10,21 @@
 
 namespace fpm
 {
+namespace detail
+{
+template <typename T>
+constexpr T fast_signed_div_pow2(const T& x, unsigned int pow2) {
+  return x >= 0 ? x >> pow2 : x == std::numeric_limits<T>::min() ? std::numeric_limits<T>::min() / (T{1} << pow2) : -(-x >> pow2);
+}
+template <typename T>
+constexpr T fast_signed_mul_pow2(const T& x, unsigned int pow2) {
+  return x >= 0 ? x << pow2 : -(-x << pow2);
+}
+template <typename T>
+constexpr T last_bit(const T& x) {
+  return x >= 0 ? x & 0x1 : x == std::numeric_limits<T>::min() ? 0 : -(-x & 0x1);
+}
+}
 
 //! Fixed-point number type
 //! \tparam BaseType         the base integer type used to store the fixed-point number. This can be a signed or unsigned type.
@@ -36,7 +51,7 @@ public:
     // Like static_cast, this truncates bits that don't fit.
     template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
     constexpr inline explicit fixed(T val) noexcept
-        : m_value(static_cast<BaseType>(val * FRACTION_MULT))
+        : m_value(detail::fast_signed_mul_pow2(static_cast<BaseType>(val), FractionBits))
     {}
 
     // Converts an floating-point number to the fixed-point type.
@@ -66,7 +81,7 @@ public:
     template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
     constexpr inline explicit operator T() const noexcept
     {
-        return static_cast<T>(m_value / FRACTION_MULT);
+        return static_cast<T>(detail::fast_signed_div_pow2(m_value, FractionBits));
     }
 
     // Explicit conversion to bool
@@ -90,18 +105,17 @@ public:
 	// To correctly round the last bit in the result, we need one more bit of information.
 	// We do this by multiplying by two before dividing and adding the LSB to the real result.
 	return (EnableRounding) ? fixed(static_cast<BaseType>(
-             value / (T(1) << (NumFractionBits - FractionBits)) +
-            (value / (T(1) << (NumFractionBits - FractionBits - 1)) % 2)),
-	    raw_construct_tag{}) :
-	    fixed(static_cast<BaseType>(value / (T(1) << (NumFractionBits - FractionBits))),
+            detail::fast_signed_div_pow2(value, NumFractionBits - FractionBits) +
+            detail::last_bit(detail::fast_signed_div_pow2(value, NumFractionBits - FractionBits - 1))),
+	    raw_construct_tag{}) : fixed(static_cast<BaseType>(
+            detail::fast_signed_div_pow2(value, NumFractionBits - FractionBits)),
 	     raw_construct_tag{});
     }
 
     template <unsigned int NumFractionBits, typename T, typename std::enable_if<(NumFractionBits <= FractionBits)>::type* = nullptr>
     static constexpr inline fixed from_fixed_point(T value) noexcept
     {
-        return fixed(static_cast<BaseType>(
-            value * (T(1) << (FractionBits - NumFractionBits))),
+        return fixed(static_cast<BaseType>(detail::fast_signed_mul_pow2(value, FractionBits - NumFractionBits)),
             raw_construct_tag{});
     }
 
@@ -138,7 +152,7 @@ public:
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
     constexpr inline fixed& operator+=(I y) noexcept
     {
-        m_value += y * FRACTION_MULT;
+        m_value += detail::fast_signed_mul_pow2(static_cast<BaseType>(y), FractionBits);
         return *this;
     }
 
@@ -151,7 +165,7 @@ public:
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
     constexpr inline fixed& operator-=(I y) noexcept
     {
-        m_value -= y * FRACTION_MULT;
+        m_value -= detail::fast_signed_mul_pow2(static_cast<BaseType>(y), FractionBits);
         return *this;
     }
 
@@ -161,10 +175,10 @@ public:
 	    // Normal fixed-point multiplication is: x * y / 2**FractionBits.
 	    // To correctly round the last bit in the result, we need one more bit of information.
 	    // We do this by multiplying by two before dividing and adding the LSB to the real result.
-	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / static_cast<IntermediateType>(FRACTION_MULT / 2);
-	    m_value = static_cast<BaseType>((value / 2) + (value % 2));
+	    auto value = detail::fast_signed_div_pow2(static_cast<IntermediateType>(m_value) * y.m_value, FractionBits - 1);
+	    m_value = static_cast<BaseType>(detail::fast_signed_div_pow2(value, 1) + detail::last_bit(value));
 	} else {
-	    auto value = (static_cast<IntermediateType>(m_value) * y.m_value) / static_cast<IntermediateType>(FRACTION_MULT);
+	    auto value = detail::fast_signed_div_pow2(static_cast<IntermediateType>(m_value) * y.m_value, FractionBits);
 	    m_value = static_cast<BaseType>(value);
 	}
 	return *this;
@@ -184,10 +198,10 @@ public:
 	    // Normal fixed-point division is: x * 2**FractionBits / y.
 	    // To correctly round the last bit in the result, we need one more bit of information.
 	    // We do this by multiplying by two before dividing and adding the LSB to the real result.
-	    auto value = (static_cast<IntermediateType>(m_value) * static_cast<IntermediateType>(FRACTION_MULT * 2)) / y.m_value;
-	    m_value = static_cast<BaseType>((value / 2) + (value % 2));
+	    auto value = detail::fast_signed_mul_pow2(static_cast<IntermediateType>(m_value), FractionBits + 1) / y.m_value;
+	    m_value = static_cast<BaseType>(detail::fast_signed_div_pow2(value, 1) + detail::last_bit(value));
 	} else {
-	    auto value = (static_cast<IntermediateType>(m_value) * static_cast<IntermediateType>(FRACTION_MULT)) / y.m_value;
+	    auto value = detail::fast_signed_mul_pow2(static_cast<IntermediateType>(m_value), FractionBits) / y.m_value;
 	    m_value = static_cast<BaseType>(value);
 	}
         return *this;
@@ -209,7 +223,7 @@ public:
     template <typename I, typename std::enable_if<std::is_integral<I>::value>::type* = nullptr>
     constexpr inline fixed& operator%=(I y) noexcept
     {
-        m_value %= y * FRACTION_MULT;
+        m_value %= detail::fast_signed_mul_pow2(static_cast<BaseType>(y), FractionBits);
         return *this;
     }
 
