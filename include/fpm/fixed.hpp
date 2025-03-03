@@ -419,6 +419,14 @@ constexpr inline bool operator>=(const fixed<B, I, F, R>& x, const fixed<B, I, F
     return x.raw_value() >= y.raw_value();
 }
 
+#if __cplusplus > 201703L
+template <std::three_way_comparable B, typename I, unsigned int F, bool R>
+constexpr inline auto operator<=>(const fixed<B, I, F, R>& x, const fixed<B, I, F, R>& y) noexcept
+{
+    return x.raw_value() <=> y.raw_value();
+}
+#endif
+
 namespace detail
 {
 // Number of base-10 digits required to fully represent a number of bits
