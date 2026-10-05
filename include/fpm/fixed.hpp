@@ -115,7 +115,7 @@ public:
     template <unsigned int NumFractionBits, typename T, typename std::enable_if<(NumFractionBits <= FractionBits)>::type* = nullptr>
     static constexpr inline fixed from_fixed_point(T value) noexcept
     {
-        return fixed(static_cast<BaseType>(detail::fast_signed_mul_pow2(value, FractionBits - NumFractionBits)),
+        return fixed(detail::fast_signed_mul_pow2(static_cast<BaseType>(value), FractionBits - NumFractionBits),
             raw_construct_tag{});
     }
 
